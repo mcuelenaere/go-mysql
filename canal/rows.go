@@ -37,6 +37,7 @@ func newRowsEvent(table *schema.Table, action string, rows [][]interface{}, head
 	e.Header = header
 
 	e.handleUnsigned()
+	e.handleEnumValues()
 
 	return e
 }
@@ -70,6 +71,36 @@ func (r *RowsEvent) handleUnsigned() {
 				r.Rows[i][columnIdx] = uint64(value)
 			case int:
 				r.Rows[i][columnIdx] = uint(value)
+			default:
+				// nothing to do
+			}
+		}
+	}
+}
+
+func (r *RowsEvent) handleEnumValues() {
+	type EnumColumn struct {
+		Index int
+		EnumValues []string
+	}
+	enumColumns := []EnumColumn{}
+	for idx, column := range r.Table.Columns {
+		if column.EnumValues != nil {
+			enumColumns = append(enumColumns, EnumColumn{idx, column.EnumValues})
+		}
+	}
+
+	if len(enumColumns) == 0 {
+		return
+	}
+
+	for i := 0; i < len(r.Rows); i++ {
+		for _, column := range enumColumns {
+			switch value := r.Rows[i][column.Index].(type) {
+			case int64:
+				r.Rows[i][column.Index] = column.EnumValues[value]
+			case int:
+				r.Rows[i][column.Index] = column.EnumValues[value]
 			default:
 				// nothing to do
 			}
